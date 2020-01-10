@@ -27,10 +27,10 @@ tau = 2.1 # convexity of costs
 share_red = 1/3
 share_blue = 1/3
 share_green = 1-share_red-share_blue
+possible_X = [[1, 0],[0, 1],[1,1]]
 
 # Randomly generate the matrix of characteristics (Generating this randomly is NOT a good idea)
 # Note that this way of generating guarantees that X_i=[0,0] does not occur
-#possible_X = [[1, 0],[0, 1],[1,1]]
 #X_ind = np.random.choice(len(possible_X), size=n, p=[share_red,share_blue,share_green])
 #X = np.array([possible_X[X_ind[i]] for i in range(len(X_ind))])
 
