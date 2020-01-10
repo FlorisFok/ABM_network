@@ -16,12 +16,12 @@ import networkx as nx
 np.set_printoptions(precision=4, threshold=10000, linewidth=150, suppress=True)
 
 # Gloabal parameter inputs
-n = 10 # Number of agents
-delta = 0.5 # weight placed on indirect links
-gamma = 0.2 # weight placed on additional utility derived from a mutual link
-c = 0.5 # cost of forming and maintaining links
+n = 20 # Number of agents
+delta = 0.2 # weight placed on indirect links
+gamma = 0 # weight placed on additional utility derived from a mutual link
+c = 2 # cost of forming and maintaining links
 b = 1 # strength of preference for links to similar agents 
-sigma = 0.2 # standard deviation of the shocks to utility
+sigma = 0.5 # standard deviation of the shocks to utility
 
 # Randomly generate the initial network configuration
 p_link_0 = 0.5 # Uniform initial link probability
@@ -34,7 +34,7 @@ share_red = 1/4
 share_blue = 1/4
 share_green = 1-share_red-share_blue
 # Note that this way of generating guarantees that X_i=[0,0] does not occur
-possible_X = [[0, 1],[1, 0],[1,1]]
+possible_X = [[1, 0],[0, 1],[1,1]]
 X_ind = np.random.choice(len(possible_X), size=n, p=[share_red,share_blue,share_green])
 X = np.array([possible_X[X_ind[i]] for i in range(len(X_ind))])
 
@@ -79,11 +79,20 @@ def step(g,X):
     
     if U_with_link > U_without_link:
         g[i,j] = 1
+#        if g_ij_initial==1:
+#            print('Link kept')
+#        if g_ij_initial==0:
+#                print('Link formed')
     if U_with_link == U_without_link:
         g[i,j] = g_ij_initial
+#        print('Status quo')
     if U_with_link < U_without_link:
         g[i,j] = 0
-    
+#        if g_ij_initial==1:
+#            print('Link destroyed')
+#        if g_ij_initial==0:
+#            print('No link formed')
+#    print(g)
     return g
 
 
@@ -93,16 +102,29 @@ def plot_network(g):
     edges = zip(rows.tolist(), cols.tolist())
     gr = nx.DiGraph() # Calling the DIRECTED graph method
     gr.add_edges_from(edges)
-    nx.draw(gr, with_labels=True, node_size=500)
+    
+    # Add node colors according to X
+    color_map = []
+    for i in range(n):
+        if np.all(X[i]==[1,0]):
+            color_map.append('red')
+        if np.all(X[i]==[0,1]):
+            color_map.append('blue')
+        if np.all(X[i]==[1,1]):
+            color_map.append('green')
+            
+    nx.draw(gr, node_color=color_map, with_labels=True, node_size=500)
     plt.show()
 
 
-# Run the simulation until T steps are reached
+# Run the simulation until T network configurations have been generated
 T=1000
-for t in range(T):
-    plot_network(g_sequence[-1])
+t_plot = 100 # Produce a plot every t_plot steps
+for t in range(T-1):
     g_new = step(g_sequence[-1],X)
     g_sequence.append(g_new)
-    
-    
+    if t%t_plot == 0 and t/t_plot>=1:
+        plot_network(g_sequence[-1])
+#        print(g_sequence[-1])
+#        print(np.linalg.norm((g_sequence[-1]-g_sequence[-t_plot]), ord=1))
     
