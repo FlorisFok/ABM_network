@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import math
 import networkx as nx
 # Print options
-np.set_printoptions(precision=4, threshold=10000, linewidth=150, suppress=True)
+np.set_printoptions(precision=3, floatmode='fixed', suppress=True)
 
 # Gloabal parameter inputs
 n = 10 # Number of agents
@@ -22,6 +22,7 @@ gamma = 0.5 # weight placed on additional utility derived from a mutual link
 c = 0.2 # cost of forming and maintaining links
 b = 0.3 # strength of preference for links to similar agents 
 sigma = 0 # standard deviation of the shocks to utility
+tau = 2.1 # convexity of costs
 
 share_red = 1/3
 share_blue = 1/3
@@ -41,7 +42,7 @@ X = np.array([possible_X[0] for i in range(int(share_red*n))] +
               [possible_X[2] for i in range(n-int(share_red*n)-int(share_blue*n))])
 
 # Randomly generate the initial network configuration
-p_link_0 = 0.3 # Uniform initial link probability
+p_link_0 = 0 # Uniform initial link probability
 g_0 = np.random.choice([0, 1], size=(n,n), p=[1-p_link_0,p_link_0])
 np.fill_diagonal(g_0, 0) # The diagonal elements of the adjacency matrix are 0 by convention
 g_sequence = [g_0] # Sequence of adjacency matrices
@@ -70,7 +71,7 @@ def U(i,g,X):
             else:
                 indirect_u += g[i,j]*g[j,k]*u(i,k,X)
             
-    return direct_u + gamma*mutual_u + delta*indirect_u - d_i**2*c
+    return direct_u + gamma*mutual_u + delta*indirect_u - d_i**tau*c
 
 def step(g,X):
     """ Randomly selects an agent i to revise their link with another random 
@@ -135,8 +136,9 @@ for t in range(T-1):
     if t%t_plot == 0 and t/t_plot>0:
         plot_network(g_sequence[-1])
 #        print(np.linalg.norm((g_sequence[t+1]-g_sequence[t+1-t_plot]), ord=1))
-        print('Average degree: {}'
-              .format(np.mean([sum(g_sequence[-1][i]) for i in range(n)])))
+        degrees = [sum(g_sequence[-1][i]) for i in range(n)]
+        print('Mean, variance of degree: {},{}'
+              .format(np.mean(degrees),np.var(degrees)))
 #        print('Average degree for reds blues, and greens: {},{},{}'
 #              .format(np.mean([sum(g_sequence[-1][i]) for i in range(n)])))
     
