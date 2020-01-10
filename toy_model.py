@@ -27,6 +27,7 @@ sigma = 0.2 # standard deviation of the shocks to utility
 p_link_0 = 0.5 # Uniform initial link probability
 g_0 = np.random.choice([0, 1], size=(n,n), p=[1-p_link_0,p_link_0])
 np.fill_diagonal(g_0, 0) # The diagonal elements of the adjacency matrix are 0 by convention
+g_sequence = [g_0] # Sequence of adjacency matrices
 
 # Randomly generate the matrix of characteristics
 share_red = 1/4
@@ -67,10 +68,10 @@ def step(g,X):
     agent j. Returns the updated adjacency matrix """
     i = np.random.choice(range(n))
     j = np.random.choice([x for x in range(n) if x!=i]) # select from agents other than i
-    
+    g_ij_initial = g[i,j]
+
     eps = np.random.normal(scale=sigma,size=2) # Simulate two shocks from normal with std dev sigma
     
-    g_ij_initial = g[i,j]
     g[i,j] = 1
     U_with_link = U(i,g,X) + eps[0]
     g[i,j] = 0
@@ -95,7 +96,13 @@ def plot_network(g):
     nx.draw(gr, with_labels=True, node_size=500)
     plt.show()
 
-plot_network(g_0)
 
+# Run the simulation until T steps are reached
+T=1000
 for t in range(T):
-g_1step(g_0,X)
+    plot_network(g_sequence[-1])
+    g_new = step(g_sequence[-1],X)
+    g_sequence.append(g_new)
+    
+    
+    
