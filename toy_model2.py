@@ -77,7 +77,11 @@ def U(g, i) :
     d_i = g[i].sum()
     direct_u = np.sum(g[i] * pre_U[i])
     mutual_u = np.sum(g[i] * g.T[i] * pre_U[i])
-    indirect_u = np.sum((g.T.dot(g[i, :]) * pre_U)[i])
+
+    # Indirect
+    a = (g.T.dot(g[i, :]) * pre_U)[i]
+    a[i] = 0
+    indirect_u = np.sum(a)
 
     return direct_u + gamma * mutual_u + delta * indirect_u - d_i ** alpha * c
 
@@ -131,7 +135,7 @@ def plot_network(g):
 # Run the simulation for T total steps or until convergence is reached
 T = 10000
 T = int(T/n)
-t_plot = 49
+t_plot = 20
 
 pre_U = make_pre_cal_u(n, X)
 indexes = list(range(n))
@@ -141,34 +145,36 @@ zero_sequence = np.zeros(T)
 g_sequence[0] = g_0
 g_old = g_0
 
-# zeros = np.zeros(3)
+n_zeros = 3
+begin_conv = 20
+zeros = np.zeros(n_zeros)
+zero_sequence[0] = 1.0
+
 for t in range(1, T):
-    # print(t, end='\r')
+    print(t, end='\r')
     np.random.shuffle(indexes)
 
     # Perform a step and attach the new network
-    g_new = step(g_old, indexes)
-    g_sequence[t] = g_new
-    zero_sequence[t] = (np.sum(g_sequence[t] - g_sequence[t-1]))
+    g_sequence[t] = step(g_sequence[t - 1], indexes)
+    zero_sequence[t] = (np.sum(g_sequence[t] - g_sequence[t - 1]))
 
-    print(zero_sequence[t])
-    # try:
-    #     if sum(zero_sequence[t-3:t]) == zeros:
-    #         print(t, 'STOP')
-    #         break
-    # except:
-    #     pass
-    g_old = g_new
+    try:
+        if t > begin_conv and zero_sequence[t - n_zeros :t].any() == zeros.any() :
+            print(zero_sequence[t - n_zeros :t])
+            print(t, 'STOP')
+            break
+    except:
+        pass
 
     # Produce a plot and diagnostics every t_plot steps
     if (t+1)%t_plot == 0:
-        plot_network(g_new)
+        plot_network(g_sequence[t])
 
 
 
 
 pickle.dump(g_sequence, open('gsec.p', 'wb'))
 print(time.time() - t1)
-plot_network(g_sequence[-2])
+plot_network(g_sequence[t])
 print("done")
 plt.show()
