@@ -8,6 +8,10 @@ import time
 import pickle
 
 fig = plt.figure()
+colors = ['#FFFFFF', '#FF0000','#00FF00', '#0000FF',
+          '#FFFF00', '#00FFFF', '#FF00FF', '#C0C0C0',
+          '#808080', '#800000',	'#808000', '#008000',
+          '#800080', '#008080', '#000080']
 
 
 class Model():
@@ -62,7 +66,7 @@ class Model():
         self.U = pre_cal_u
 
 
-    def matrix_U(self, i) :
+    def U_of_matrix(self, i) :
         """ Returns the full utility of agent i given the current network structure
         g and the matrix of characteristics X """
 
@@ -95,10 +99,10 @@ class Model():
 
             # find value for new connection and removed connection
             self.g[i, r1] = 0
-            U_without = self.matrix_U(i) + eps[i]
+            U_without = self.U_of_matrix(i) + eps[i]
 
             self.g[i, r1] = 1
-            U_with = self.matrix_U(i) + eps[-i]
+            U_with = self.U_of_matrix(i) + eps[-i]
 
             # Evaluate better option
             if U_without > U_with:
@@ -106,27 +110,30 @@ class Model():
             else:
                 self.g[i, r1] = 1
 
-    def plot_network(self) :
+    def plot_network(self, final=False) :
         """ Uses networkX to plot the directed network g """
         rows, cols = np.where(self.g == 1)
+
+        # MAke the network
         edges = zip(rows.tolist(), cols.tolist())
-        gr = nx.DiGraph()  # Calling the DIRECTED graph method
+        gr = nx.DiGraph()
         gr.add_nodes_from(range(self.n))
         gr.add_edges_from(edges)
 
         # Add node colors according to X
         color_map = []
         for i in range(self.n) :
-            if np.all(self.X[i] == self.pos_X[0]) :
-                color_map.append('red')
-            if np.all(self.X[i] == self.pos_X[1]) :
-                color_map.append('blue')
-            if np.all(self.X[i] == self.pos_X[2]) :
-                color_map.append('green')
+            for j in range(len(self.pos_X)):
+                if np.all(self.X[i] == self.pos_X[j]) :
+                    color_map.append(colors[j])
 
         fig.clear()
         nx.draw(gr, node_color=color_map, with_labels=True, node_size=500)
-        plt.pause(1)
+
+        if not final:
+            plt.pause(1)
+        else:
+            plt.pause(100)
 
     def run(self, T, t_plot):
 
@@ -142,7 +149,7 @@ class Model():
             print('step:', t, end='\r')
 
             self.g_sequence[t] = self.g
-            self.zero_sequence[t] = conv_rule(self.g_sequence)
+            self.zero_sequence[t] = conv_rule(self.g_sequence, t)
 
             try :
                 if t > MINIMAL and stop_rule(self.zero_sequence, t):
@@ -153,7 +160,30 @@ class Model():
 
             # Produce a plot and diagnostics every t_plot steps
             if t  % t_plot == 0 :
-                self.plot_network()
+                print("degree:", np.sum(self.g))
+                # self.plot_network()
+
+    def rank(self):
+        '''
+        Rank the connections you have
+        :return:
+        '''
+
+        value_of_con = np.zeros((self.n, self.n))
+        for i in range(self.n):
+            for j in range(self.n):
+                old = self.g[i][j]
+
+                self.g[i][j] = 0
+                not_conn = self.U_of_matrix(i)
+
+                self.g[i][j] = 1
+                conn = self.U_of_matrix(i)
+
+                self.g[i][j] = old
+                value_of_con[i][j] = not_conn - conn
+
+        print(value_of_con)
 
 if __name__ == "__main__":
 
@@ -169,8 +199,9 @@ if __name__ == "__main__":
         return d_i ** ALPHA * C
 
     ## conv_rule ###########
-    def conv_rule(g_sequence):
-        return (np.sum(g_sequence[t] - g_sequence[t - 1]))
+    def conv_rule(g_sequence, t):
+        return np.linalg.norm((g_sequence[t-1] - g_sequence[t]), ord=1)
+        # return (np.sum(g_sequence[t] - g_sequence[t - 1]))
 
     ## STOP RULE ###########
     def stop_rule(zero_sequence, t):
@@ -181,15 +212,21 @@ if __name__ == "__main__":
     MINIMAL = n_zeros
     ########################
 
-    shares = [0.33, 0.33, 0.33]
-    possible_X = [[1, 0], [0, 1], [1, 1]]
+    # shares = [0.33, 0.33, 0.33]
+    # possible_X = [[1, 0], [0, 1], [1, 1]]
+    shares = [0.1] * 10
+    possible_X = [[1, 0, 1], [0, 1, 1], [1, 1, 1], [1, 2, 0],
+                  [1, 0, 2], [0, 1, 2], [2, 2, 1], [2, 2, 0],
+                  [2, 0, 2], [0, 2, 2]]
+
     pos_link = 0.1
-    n = 50  # Number of agents
+    n = 100  # Number of agents
 
     # make and run model
     M = Model(n, pos_link, shares, possible_X)
-    M.run(1000, 50)
+    M.run(500, 10)
+    # M.rank()
 
     # Save result
-    M.plot_network()
+    M.plot_network(final=True)
     fig.savefig('result.png')
