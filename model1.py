@@ -4,8 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import math
 import networkx as nx
-import time
-import pickle
+import sys
 
 fig = plt.figure()
 colors = ['#FFFFFF', '#FF0000','#00FF00', '#0000FF',
@@ -186,7 +185,7 @@ class Model():
         print(value_of_con)
 
 if __name__ == "__main__":
-
+    # CONSTANTS
     DELTA = 0.3  # weight placed on indirect links
     GAMMA = 0.5  # weight placed on additional utility derived from a mutual link
     C = 0.2  # cost of forming and maintaining links
@@ -212,17 +211,25 @@ if __name__ == "__main__":
     MINIMAL = n_zeros
     ########################
 
-    # shares = [0.33, 0.33, 0.33]
+    # Possible relations
     # possible_X = [[1, 0], [0, 1], [1, 1]]
-    shares = [0.1] * 10
     possible_X = [[1, 0, 1], [0, 1, 1], [1, 1, 1], [1, 2, 0],
                   [1, 0, 2], [0, 1, 2], [2, 2, 1], [2, 2, 0],
                   [2, 0, 2], [0, 2, 2]]
 
+    # Equal shares
+    shares = [1/len(possible_X)] * len(possible_X)
+
+    # Check if there are enough colors
+    if len(possible_X)  > len(colors):
+        print("Amount of colors is less then possible X's")
+        sys.exit()
+
+    # Initialize arguments
     pos_link = 0.1
     n = 100  # Number of agents
 
-    # make and run model
+    # Make and run model
     M = Model(n, pos_link, shares, possible_X)
     M.run(500, 10)
     # M.rank()
