@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import math
 import networkx as nx
 import sys
+import pickle
 
 fig = plt.figure()
 colors = ['#FFFFFF', '#FF0000','#00FF00', '#0000FF',
@@ -111,7 +112,7 @@ class Model():
 
     def plot_network(self, final=False) :
         """ Uses networkX to plot the directed network g """
-        rows, cols = np.where(self.g == 1)
+        rows, cols = np.where(self.g == 1) # returns row and column numbers where an edge exists
 
         # MAke the network
         edges = zip(rows.tolist(), cols.tolist())
@@ -235,5 +236,8 @@ if __name__ == "__main__":
     # M.rank()
 
     # Save result
+    # save the individuals_friendships
+    individuals_friendships = [M.X,M.g]
+    pickle.dump(individuals_friendships, open("individuals_friendships.p", "wb"))
     M.plot_network(final=True)
     fig.savefig('result.png')
