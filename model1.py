@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     # Save result
     # save the individuals_friendships
-    individuals_friendships = [M.X,M.g]
-    pickle.dump(individuals_friendships, open("individuals_friendships.p", "wb"))
+    individuals_friendships_utilities = [M.X,M.g,M.U]
+    pickle.dump(individuals_friendships_utilities, open("individuals_friendships_utilities.p", "wb"))
     M.plot_network(final=True)
     fig.savefig('result.png')
