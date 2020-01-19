@@ -56,6 +56,7 @@ with open('g_list.pkl', 'wb') as f:
 for school in range(1,n_schools+1):
     # skip school 48 as it does not exist
     if school != 48:
+        #n = 71 # comment out if g_list is made
         url = 'http://moreno.ss.uci.edu/comm' + str(school)
         url_X = url + '_att.dat'
 
@@ -83,10 +84,17 @@ for school in range(1,n_schools+1):
             # change the value of the school_ID to 0 if it were nan
             if not np.isfinite(X[0,3]):
                 X[:,3] = 0
-            # remove last row of school 35, as it contains a questionmark
+            # the last row of school 35 contains a "?", which should be converted into 0
             if school == 35:
-                X = X[0:-1]
+                print('X[-1,1] = {}'.format(X[-1,1]))
+                X[-1,1] = 0
             X = X.astype('int32')
+
+        # convert the race data to one variable per race
+        race_numbers = X[:,1]
+        dummy_race = pd.get_dummies(race_numbers)
+        X = np.concatenate((X, dummy_race), axis=1)
+
     else:
         X = np.zeros((1,1))
 
