@@ -6,26 +6,31 @@ import math
 import networkx as nx
 import sys
 import pickle
-import numpy
+import os
+import pickle
 
-fig = plt.figure()
-colors = ['#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
+fig, (ax1, ax2, ax3) = plt.subplots(1,3)
+colors = ['#FF0000', '#00FF00', '#0000FF',
           '#FFFF00', '#00FFFF', '#FF00FF', '#C0C0C0',
           '#808080', '#800000',	'#808000', '#008000',
           '#800080', '#008080', '#000080']
 
+
 ## Cost function #######
 def cost(d_i) :
     return d_i ** ALPHA * C
+
 
 ## conv_rule ###########
 def conv_rule(g_sequence, t) :
     return np.linalg.norm((g_sequence[t - 1] - g_sequence[t]), ord=1)
     # return (np.sum(g_sequence[t] - g_sequence[t - 1]))
 
+
 ## STOP RULE ###########
 def stop_rule(zero_sequence, t) :
     return zero_sequence[t - n_zeros :t].any() == zeros.any()
+
 
 def ana_dyads(connectivity):
     """
@@ -65,6 +70,7 @@ def ana_dyads(connectivity):
 
     return PTCMUT, PTCASY, RHO2
 
+
 class ConnectionMatrix:
 
     def __init__(self, n, p_link_0):
@@ -94,13 +100,12 @@ class ConnectionMatrix:
 
 class Model:
 
-    def __init__(self, g, n, shares, pos_X):
+    def __init__(self, g, n, X, pos_X):
         self.n = n
-        self.shares = shares
         self.pos_X = pos_X
         self.g = g
 
-        self.X = self.make_X()
+        self.X = X
         self.U = self.make_pre_cal_U()
         self.P = self.make_prop()
 
@@ -108,28 +113,17 @@ class Model:
         self.g_sequence = None
         self.zero_sequence = None
 
-    def make_X(self):
-        """
-        Create X matrix
-        """
-        x = []
-        for i, share in enumerate(self.shares):
-            x += int(share * self.n) * [self.pos_X[i]]
-
-        x += (self.n - len(x)) * [self.pos_X[i]]
-        return np.array(x)
-
     def make_prop(self):
         # Setup probability matrix
         prop = np.zeros((self.n, self.n))
 
         # Loop over the person and their peers
-        for i, person in enumerate(self.X):
-            for j, other in enumerate(self.X):
+        for i in range(self.n):
+            for j in range(self.n):
                 if i == j:
                     prop[i, j] = 0
                 else:
-                    prop[i, j] = np.dot(person, other) + MIN_PROP
+                    prop[i, j] = self.U[i, j] + MIN_PROP
 
             # Normalize
             prop[i, :] = prop[i, :] / np.sum(prop[i, :])
@@ -142,10 +136,16 @@ class Model:
         # Setup U
         pre_cal_u = np.zeros((self.n, self.n))
 
+        race = list(self.X['race'])
+        sex = list(self.X['sex'])
+        grade = list(self.X['grade'])
+
         # Fill U
         for i in range(self.n):
             for j in range(self.n):
-                pre_cal_u[i, j] = math.exp(-B * np.linalg.norm((self.X[i] - self.X[j]), ord=1))
+                pre_cal_u[i, j] = math.exp(- B1 * abs(sex[i] - sex[j])
+                                           - B2 * abs(grade[i] - grade[j])
+                                           - B3 * (0 if race[i] == race[j] else 1))
 
         return pre_cal_u
 
@@ -199,19 +199,43 @@ class Model:
         gr = nx.DiGraph()
         gr.add_nodes_from(range(self.n))
         gr.add_edges_from(edges)
+        # fig.clear()
+
+        race = list(self.X['race'])
+        sex = list(self.X['sex'])
+        grade = list(self.X['grade'])
+
+        ax1.clear()
+        ax2.clear()
+        ax3.clear()
 
         # Add node colors according to X
+        ax1.set_title('sex')
         color_map = []
         for i in range(self.n):
-            for j in range(len(self.pos_X)):
-                if np.all(self.X[i] == self.pos_X[j]):
+            for j, unit in enumerate(set(sex)):
+                if np.all(sex[i] == unit):
                     color_map.append(colors[j])
+        nx.draw(gr, ax=ax1, node_color=color_map, with_labels=False, node_size=100)
 
-        fig.clear()
-        nx.draw(gr, node_color=color_map, with_labels=True, node_size=500)
+        ax2.set_title('race')
+        color_map = []
+        for i in range(self.n) :
+            for j, unit in enumerate(set(race)) :
+                if np.all(race[i] == unit) :
+                    color_map.append(colors[j])
+        nx.draw(gr, ax=ax2, node_color=color_map, with_labels=False, node_size=100)
+
+        ax3.set_title('grade')
+        color_map = []
+        for i in range(self.n) :
+            for j, unit in enumerate(set(grade)) :
+                if np.all(grade[i] == unit) :
+                    color_map.append(colors[j])
+        nx.draw(gr, ax=ax3, node_color=color_map, with_labels=False, node_size=100)
 
         if not final:
-            plt.pause(1)
+            plt.pause(2)
         else:
             plt.pause(100)
 
@@ -220,8 +244,8 @@ class Model:
         Saves data from the simulation to a pickle file.
         :param pickle_name: Name of pickle file
         """
-        # individuals_friendships_utilities = [self.X, self.g.g, self.U]
-        # pickle.dump(individuals_friendships_utilities, open(pickle_name, "wb"))
+        individuals_friendships_utilities = [self.X, self.g.g, self.U]
+        pickle.dump(individuals_friendships_utilities, open(pickle_name, "wb"))
 
     def run(self, total_time, t_plot=0):
         """
@@ -233,7 +257,7 @@ class Model:
         if t_plot == 0:
             t_plot = total_time
 
-        self.g_sequence = np.zeros((total_time, self.n, self.n), dtype=numpy.int8)
+        self.g_sequence = np.zeros((total_time, self.n, self.n))
         self.g_sequence[0] = self.g.g
 
         self.zero_sequence = np.zeros(total_time)
@@ -255,6 +279,8 @@ class Model:
             if t % t_plot == 0:
                 print("degree:", np.sum(self.g.g))
                 self.plot_network()
+
+        return t
 
     def rank(self):
         """
@@ -285,7 +311,10 @@ def read_excel_settings(loc):
         column = df[col]
         column = [i for i in column if i == i]
         if len(column) == 1:
-            settings_dict[col] = float(column[0])
+            try:
+                settings_dict[col] = float(column[0])
+            except:
+                settings_dict[col] = column[0]
 
         elif len(column) > 1:
             mat = [[]]
@@ -302,65 +331,84 @@ def read_excel_settings(loc):
 
     return settings_dict
 
-def main(settings):
-    # CONSTANTS
-    global DELTA, GAMMA, C, B, SIGMA, ALPHA, MIN_PROP, MINIMAL
-
-    DELTA = settings['Delta']  # weight placed on indirect links
-    GAMMA = settings['Gamma']  # weight placed on additional utility derived from a mutual link
-    C = settings['C']  # cost of forming and maintaining links
-    B = settings['B']  # strength of preference for links to similar agents
-    SIGMA = settings['Sigma']  # standard deviation of the shocks to utility
-    ALPHA = settings['Alpha']  # convexity of costs
-    MIN_PROP = settings['min prop']
-
-    n_zeros = int(settings['n zeros'])
-    zeros = np.zeros(n_zeros)
-    MINIMAL = n_zeros
-    ########################
-
-    # Possible relations
-    possible_X = np.array(settings['pos X'])
-
-    # Equal shares
-    shares = [1 / len(possible_X)] * len(possible_X)
-
-    # Check if there are enough colors
-    if len(possible_X) > len(colors) :
-        print("Amount of colors is less then possible X's")
-        sys.exit()
-
-    # Initialize arguments
-    pos_link = settings['pos link']
-    n_agents = int(settings['n agents'])
-
-    # Make and run model
-    g = ConnectionMatrix(n_agents, pos_link)
-    M = Model(g, n_agents, shares, possible_X)
-    M.run(int(settings['runs']), 0)
-    # M.rank()
-
-    # Save result
-    # save the individuals_friendships
-    # M.save2pickle("individuals_friendships_utilities.p")
-    M.plot_network(final=True)
-    fig.savefig('result.png')
+def avg(l, reruns):
+    return [sum(l[i*reruns:(i+1)*reruns])/reruns for i in range(int(len(l)/reruns))]
 
 if __name__ == "__main__":
-    settings = {
-        'Delta': 0.3,
-        'Gamma': 0.5,
-        'C': 0.2,
-        'B': 0.3,
-        'Sigma': 0.01,
-        'Alpha': 2.1,
-        'min prop': 10,
-        'n zeros': 3,
-        'pos link': 0.1,
-        'n agents': 2000,
-        'runs': 5000,
-        'pos X': [[1, 0, 1], [0, 1, 1], [1, 1, 1], [1, 2, 0],
-                  [1, 0, 2], [0, 1, 2], [2, 2, 1], [2, 2, 0],
-                  [2, 0, 2], [0, 2, 2]]
-    }
-    main(settings)
+    # Settings
+    name = [i for i in os.listdir() if 'xlsx' in i and 'settings' in i][0]
+    settings = read_excel_settings(name)
+
+    # Plot info
+    plot_data_stopped = []
+    plot_data_A1 = []
+    plot_data_A2 = []
+    plot_data_A3 = []
+    plot_var = 'B'
+
+    # True
+    g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
+    big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
+    repeats = len(big_x)
+
+    for row in range(len(settings[plot_var])):
+        # CONSTANTS
+        DELTA = settings['Delta'][row]  # weight placed on indirect links
+        GAMMA = settings['Gamma'][row]  # weight placed on additional utility derived from a mutual link
+        C = settings['C'][row]  # cost of forming and maintaining links
+        B1,B2, B3, = settings['B1'][row], settings['B2'][row], settings['B3'][row]  # strength of preference for links_s
+        SIGMA = settings['Sigma'][row]  # standard deviation of the shocks to utility
+        ALPHA = settings['Alpha'][row]  # convexity of costs
+        MIN_PROP = settings['min prop'][row]
+        pos_link = settings['pos link'][row]
+
+        n_zeros = int(settings['n zeros'][row])
+        zeros = np.zeros(n_zeros)
+        MINIMAL = n_zeros
+        ########################
+
+        for rerun in range(repeats):
+            X = big_x[rerun]
+            possible_X = [i[0] for i in list(X.groupby(['sex', 'race']))]
+            n_agents = len(X['sex'])
+
+            # Make and run model
+            g = ConnectionMatrix(n_agents, pos_link)
+            M = Model(g, n_agents, X, possible_X)
+            stopped = M.run(int(settings['runs'][row]), 0)
+            # M.rank()
+
+            PTCMUT, PTCASY, RHO2 = ana_dyads(M.g.g)
+            plot_data_stopped.append(stopped)
+            plot_data_A1.append(PTCMUT)
+            plot_data_A2.append(PTCASY)
+            plot_data_A3.append(RHO2)
+            M.plot_network()
+
+
+    PTCMUT, PTCASY, RHO2 = [], [], []
+    for g in g_matrix:
+        a1, a2, a3 = ana_dyads(g)
+        PTCMUT.append(a1)
+        PTCASY.append(a2)
+        RHO2.append(a3)
+
+    plt.title(f'{plot_var} vs. Analyse')
+    plt.subplot(121)
+    plt.plot(settings[plot_var], avg(plot_data_A1, repeats), label='A1', color='r')
+    plt.plot(settings[plot_var], avg(plot_data_A2, repeats), label='A2', color='g')
+    plt.plot(settings[plot_var], avg(plot_data_A3, repeats), label='A3', color='b')
+
+    le = len(settings[plot_var])
+    plt.plot(settings[plot_var], [avg(PTCMUT, repeats)]*le, linestyle='--', label='trueA1', color='r')
+    plt.plot(settings[plot_var], [avg(PTCASY, repeats)]*le, linestyle='--', label='trueA2', color='g')
+    plt.plot(settings[plot_var], [avg(RHO2, repeats)]*le, linestyle='--', label='trueA3', color='b')
+
+    plt.xlabel(plot_var)
+    plt.legend()
+
+    plt.subplot(122)
+    plt.plot(settings[plot_var], avg(plot_data_stopped, repeats), label='stopped')
+    plt.xlabel(plot_var)
+    plt.legend()
+    plt.show()
