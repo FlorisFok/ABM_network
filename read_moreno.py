@@ -31,7 +31,7 @@ for school in range(1,n_schools+1):
     url = 'http://moreno.ss.uci.edu/comm' + str(school)
     url_X = url + '_att.dat'
 
-#    print("converting data of school {}".format(school))
+    print("Converting data of school {}".format(school))
 
     X = pd.read_csv(url_X, delim_whitespace=True, names=['sex','race','grade','school'], skiprows=8)
     # remove top and bottom lines if they don't contain numbers < the number of rows before the data is not always equal
@@ -52,31 +52,39 @@ for school in range(1,n_schools+1):
         
     X = X.astype('int8')
     
-    # give indices of observations with at least one missing value
-    missing_ind = np.unique(np.where(X[['sex','race','grade']] == 0)[0])
     
     # Read in network structure
     url_g = url + '.dat'
     df_g = pd.read_csv(url_g, delim_whitespace=True,
                        names=['ego','alter','tie_strength'], skiprows=4)
 
+
     g = np.zeros((n,n))
     for row in range(len(df_g)):
-        i = df_g.ego.iloc[row]-1
+        i = df_g.ego.iloc[row]-1 # -1 because the data does not have indeces starting from 0
         j = df_g.alter.iloc[row]-1
         try:
             g[i,j] = 1
         except Exception as e:
             print(e) # for infrequently encountered out of bound errors, i.e.
             # invalid nomination ids
+            
+            
+    # Check average degree to make sure everything is working as intended
+    print('Avg degree is {}'.format(sum([sum(g[i]) for i in range(n)]/n)))
 
-#    print(sum([sum(g[i]) for i in range(n)]/n)) # Check average degree to make
-    # sure everything is working as intended
+    # Add 1 to school
+    X.school = X.school + 1
     
-    # Remove missing values 
-    X = X[~X.index.isin(missing_ind)]
+    full_ind = X.index
     
-    # Remove rows and columns with index in missing_values
+    # Remove rows of X with missing values (0)
+    X = X.loc[(X!=0).all(1)]
+    
+    complete_ind = X.index
+    
+    missing_ind = [i for i in full_ind if i not in complete_ind]
+    
     for i in missing_ind:
         try:
             g = np.delete(g, i, axis=0)
@@ -84,6 +92,7 @@ for school in range(1,n_schools+1):
         except Exception as e:
             print(e) # out of bound errors
     
+
     # If length of X and g are not equal, remove last obs from the longer dataset
     g_X_diff = len(g)-len(X)
     print(g_X_diff)
@@ -97,6 +106,7 @@ for school in range(1,n_schools+1):
     print('Community {}: {} observations and  {} missing'.format(school,
           len(X), n-len(X)))
   
+    print(X.min())
     X_list.append(X)
     g_list.append(g)
     missing_list.append(n-len(X))
@@ -104,6 +114,8 @@ for school in range(1,n_schools+1):
 print('{} is the average share of missing observations.'.format(
         np.average([missing_list[i]/len(X_list[i]) for i in range(len(missing_list))])))
 
+
+#np.unique(np.where(X[['sex','race','grade']] == 0))
 #for school in range(len(X_list)):
 #    print(sum([X_list[school].iloc[i]['sex','race','grade']==0 for i in range(len(X_list[school]))]))
 #    print(range(len(X_list[school])),'\n')
@@ -122,12 +134,14 @@ with open('g_list.pkl', 'wb') as f:
 with open('missing_list.pkl', 'wb') as f:
     pickle.dump(missing_list, f) 
     
+    
+
+    
 # Descriptive statistics
 #for i in range(len(X_list)):
-#    if len(X_list[i])<100:
-#        print('\nSchool {}'.format(i))
-#        print(X_list[i].describe())
-#
+#    print('\nSchool {}'.format(i))
+#    print(X_list[i].describe())
+
 #small_sample_ind = [67,68,74]
 #X_small_sample = [X_list[i] for i in small_sample_ind]
 #g_small_sample = [g_list[i] for i in small_sample_ind]
