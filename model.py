@@ -205,99 +205,6 @@ def analyse_network(connectivity, characteristics) :
 
     return av_degree, RHO2, clustering_coefficient[0], segreg_ind[0], segreg_ind[1], segreg_ind[2]
 
-#
-# def analyse_network(connectivity) :
-#     # Output:
-#     # density at maximum reach (RCHDEN), > den_max_reach
-#     # relative density (RELDEN), > rel_den
-#     # proportion symmetric dyads (PTCMUT), > p_symm_dyads
-#     # mutuality index (RHO2), > mutuality_index
-#
-#     # input:
-#     # connectivity matrix with students claiming to have friends in row and students claimed to be befriended in columns
-#
-#     nodes = connectivity.shape[0]
-#     mutual_d = 0
-#     asym_d = 0
-#     out_degrees = []
-#
-#     # density DENX2
-#     # DENX2 = np.sum(connectivity)/(nodes*(nodes-1))
-#
-#     # density at maximum reach RCHDEN
-#
-#     # define the function to tranfer adjacency matrix to reachability matrix
-#     # Prints reachability matrix of graph[][] using Floyd Warshall algorithm
-#     # function found on https://www.geeksforgeeks.org/transitive-closure-of-a-graph/
-#     reachability = copy.deepcopy(connectivity)
-#     '''reach[][] will be the output matrix that will finally
-#     have reachability values.
-#     Initialize the solution matrix same as input graph matrix'''
-#     reach = [i[:] for i in reachability]
-#     '''Add all vertices one by one to the set of intermediate
-#     vertices.
-#     ---> Before start of a iteration, we have reachability value
-#     for all pairs of vertices such that the reachability values
-#     consider only the vertices in set
-#     {0, 1, 2, .. k-1} as intermediate vertices.
-#     ----> After the end of an iteration, vertex no. k is
-#     added to the set of intermediate vertices and the
-#     set becomes {0, 1, 2, .. k}'''
-#     for k in range(nodes) :
-#
-#         # Pick all vertices as source one by one
-#         for i in range(nodes) :
-#
-#             # Pick all vertices as destination for the
-#             # above picked source
-#             for j in range(nodes) :
-#                 # If vertex k is on a path from i to j,
-#                 # then make sure that the value of reach[i][j] is 1
-#                 reach[i][j] = reach[i][j] or (reach[i][k] and reach[k][j])
-#
-#     RCHDEN = np.sum(reach) / (nodes * (nodes - 1))
-#
-#     # relative density RELDEN
-#     RELDEN = np.sum(connectivity) / (10 * nodes)
-#
-#     # create upper triangular matrix with 2's on mutual dyads, 1's on asymmetric dyads and count occurrence
-#     added_up = np.triu(connectivity + np.transpose(connectivity))
-#     mutual_d = np.count_nonzero(added_up == 2)
-#     asym_d = np.count_nonzero(added_up == 1)
-#     total_d = mutual_d + asym_d
-#
-#     # calculate proportion symmetric dyads (PTCMUT) and asymmetric dyads (PTCASY)
-#     PTCMUT = mutual_d / total_d
-#     # PTCASY = asym_d / total_d
-#
-#     # count total out_degree connections
-#     out_degree = connectivity.sum()
-#     # take the sum of squares of the out degree connections per individual (row)
-#     sum_squares_out = (connectivity.sum(axis=1) ** 2).sum()
-#
-#     # calculate mutuality index (RHO2) (according to Katz and Powell’s (1955))
-#     RHO2 = (2 * (nodes - 1) ** 2 * mutual_d - out_degree ** 2 + sum_squares_out) / (
-#                 out_degree * (nodes - 1) ** 2 - out_degree ** 2 + sum_squares_out)
-#
-#     # determine the local clustering coefficient mean and standard deviation
-#     clustering_coefficients = []
-#     for n_node, connections in enumerate(connectivity) :
-#         # the amount of neighbours each node has
-#         n_neighbours = np.sum(connectivity[n_node])
-#         # only consider nodes with at least 2 neighbours
-#         if n_neighbours >= 2 :
-#             # matrix of the nodes that are both neighbours of the node considered
-#             neighbour_matrix = np.dot(np.transpose([connectivity[n_node]]), [connectivity[n_node]])
-#             # the amount of connections between neighbours
-#             neighbour_connections = np.sum(connectivity * neighbour_matrix)
-#             # the amount of connections between neighbours divided by the possible amount of connections
-#             clustering_coefficients.append(neighbour_connections / (n_neighbours * (n_neighbours - 1)))
-#     mean_clustering_coefficient = np.mean(clustering_coefficients)
-#     std_clustering_coefficient = np.std(clustering_coefficients)
-#     clustering_coefficient = [mean_clustering_coefficient, std_clustering_coefficient]
-#
-#     return RCHDEN, RELDEN, RHO2, clustering_coefficient[0]
-
 
 class ConnectionMatrix:
 
@@ -597,7 +504,7 @@ def main(settings, MAX_LEN):
     _string = ['av_degree', 'RHO2', 'clustering_coefficient', 'segreg_ind0', 'segreg_ind1', 'segreg_ind2']
 
     # True
-    g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
+    # g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
     big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
 
     MAX_FRIEND = 5
@@ -635,22 +542,6 @@ def main(settings, MAX_LEN):
         models.append(model_num)
         for s, o in zip(_string, output):
             plot_data[s].append(o)
-
-    # true_data = {'av_degree':[], 'RCHDEN':[], 'RELDEN':[], 'RHO2':[],
-    #              'segreg_ind0':[], 'segreg_ind1':[], 'segreg_ind2':[]}
-
-    # for num in models:
-    #     g = g_matrix[num]
-    #     X = big_x[num]
-    #     output2 = analyse_network(g, X)
-    #     for s, o in zip(_string, output2):
-    #         true_data[s].append(o)
-    #
-    # best = 0
-    # for t in _string:
-    #     mv = avg(plot_data[t], repeats)
-    #     for tv, v in zip(true_data[t], mv):
-    #         best += abs(tv - v)
 
     return plot_data
 
