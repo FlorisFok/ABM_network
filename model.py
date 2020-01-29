@@ -445,19 +445,28 @@ class Model:
             female = []
             for j in range(self.n):
                 if self.g.g[i][j] != 0:
-                    if sex[i] == 1:
-                        male.append((j, value_of_con[i][j]))
-                    else:
-                        female.append((j, value_of_con[i][j]))
+                    try:
+                        if sex[i] == 1:
+                            male.append((j, value_of_con[i][j]))
+                        else:
+                            female.append((j, value_of_con[i][j]))
+                    except:
+                        pass
+            try:
+                female.sort(key=sort_value, reverse=True)
+                male.sort(key=sort_value, reverse=True)
 
-            female.sort(key=sort_value, reverse=True)
-            male.sort(key=sort_value, reverse=True)
+                remain = female[:MAX_FRIEND]+male[:MAX_FRIEND]
+                ind, score = zip(*remain)
+            except:
+                continue
 
-            remain = female[:MAX_FRIEND]+male[:MAX_FRIEND]
-            ind, score = zip(*remain)
             for friend in range(self.n):
-                if not friend in ind:
-                    self.g.g[i][friend] = 0
+                try:
+                    if not friend in ind:
+                        self.g.g[i][friend] = 0
+                except:
+                    pass
 
 
 
@@ -531,12 +540,7 @@ def main(settings, MAX_LEN):
         g = ConnectionMatrix(n_agents, pos_link)
         M = Model(g, n_agents, X, possible_X)
         M.run(runs, 0)
-
-        # try:
-        #     M.rank()
-        # except:
-        #     print('rank failed')
-        #     pass
+        M.rank()
 
         output = analyse_network(M.g.g, X)
         models.append(model_num)
