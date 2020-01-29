@@ -420,13 +420,13 @@ if __name__ == "__main__":
 
     # Plot info
     plot_data = {'RCHDEN':[], 'RELDEN':[], 'RHO2':[], 'clustering_coefficient':[], 'stopped':[]}
-    plot_var = 'min prop'
+    plot_var = 'Delta'
     _string = ['RCHDEN', 'RELDEN', 'RHO2', 'clustering_coefficient']
 
     # True
     g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
     big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
-    MAX_LEN = 100
+    MAX_LEN = 150
     MAX_FRIEND = 5
 
     for row in range(len(settings[plot_var])):
@@ -445,13 +445,13 @@ if __name__ == "__main__":
         MINIMAL = n_zeros
         ########################
 
-        for rerun in [6, 7]:
+        for rerun in range(len(big_x)):
             X = big_x[rerun]
             possible_X = [i[0] for i in list(X.groupby(['sex', 'race']))]
             n_agents = len(X['sex'])
 
-            # if n_agents > MAX_LEN:
-            #     continue
+            if n_agents > MAX_LEN:
+                continue
 
             # Make and run model
             g = ConnectionMatrix(n_agents, pos_link)
@@ -465,11 +465,11 @@ if __name__ == "__main__":
 
             plot_data['stopped'].append(stopped)
 
-            M.plot_network()
+            # M.plot_network()
 
 
     true_data = {'RCHDEN':[], 'RELDEN':[], 'RHO2':[], 'clustering_coefficient':[], 'stopped':[]}
-    for g_num in [6, 7]:
+    for g_num in range(len(big_x)):
         g = g_matrix[g_num]
         if g.shape[0] > MAX_LEN:
             continue
@@ -483,7 +483,7 @@ if __name__ == "__main__":
     pickle.dump(true_data, open('true_data.p', 'wb'))
     pickle.dump(plot_data, open('plot_data.p', 'wb'))
 
-
+    fig = plt.figure()
     plt.title(f'{plot_var} vs. Analyse')
     plt.subplot(121)
     repeats = int(len(plot_data['stopped'])/len(settings[plot_var]))
@@ -506,4 +506,5 @@ if __name__ == "__main__":
     plt.plot(settings[plot_var], avg(plot_data['stopped'], repeats), label='stopped')
     plt.xlabel(plot_var)
     plt.legend()
+    fig.savefig("manual_search.png")
     plt.show()
