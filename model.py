@@ -9,43 +9,29 @@ import copy
 import os
 import pickle
 
-colors = ['#FF0000', '#00FF00', '#0000FF',
-          '#FFFF00', '#00FFFF', '#FF00FF', '#C0C0C0',
-          '#808080', '#800000',	'#808000', '#008000',
-          '#800080', '#008080', '#000080']
-
-
-## Cost function #######
-def cost(d_i) :
-    return d_i ** ALPHA * C
-
-
 ## conv_rule ###########
-def conv_rule(g_sequence, t) :
+def conv_rule(g_sequence, t):
     return np.linalg.norm((g_sequence[t - 1] - g_sequence[t]), ord=1)
-    # return (np.sum(g_sequence[t] - g_sequence[t - 1]))
-
 
 ## STOP RULE ###########
 def stop_rule(zero_sequence, t) :
-    return zero_sequence[t - n_zeros :t].any() == zeros.any()
+    return zero_sequence[t - n_zeros_conv :t].any() == zeros.any()
 
 
 def analyse_network(connectivity, characteristics) :
-    # OUTPUT:
-    #
-    # average degree of nodes network            > av_degree
-    # density at maximum reach (RCHDEN)          > den_max_reach
-    # relative density (RELDEN)                  > rel_den
-    # proportion symmetric dyads (PTCMUT)        > p_symm_dyads
-    # mutuality index (RHO2)                     > mutuality_index
-    # amount of clustering (groups of friends)   > clustering_coefficient   [mean, std dev]
-    # homophily index per trait in dict          > homoph_ind               {"sex_", "race_", "grade_"}
-    # segregation index per trait in tuple       > segreg_ind               [sex, race, grade]
+    """
+        Calculate mean and standard deviation (output in tuples [mean,sd]) of following measures:
 
-    # INPUT:
-    # - connectivity matrix with row-students nominating column-students as friends
-    # - characteristics matrix with row per student, with integers indicating every group for each characteristic (sex, race, grade)
+        - degree
+        - mut_prop
+        - cluster_coef
+        - segreg_ind    > list with length of the amount of characteristics (3 for sex, race, grade)
+
+        INPUT:
+        - connectivity matrix with row-students nominating column-students as friends
+        - characteristics matrix with row per student, with integers indicating every group for each characteristic (sex, race, grade)
+    """
+
     charr = np.zeros((characteristics.shape[0], 3))
 
     for i in range(3) :
@@ -53,72 +39,28 @@ def analyse_network(connectivity, characteristics) :
 
     characteristics = charr
 
+    # get amount of nodes and list of out going dyads for every individual
     nodes = connectivity.shape[0]
-    mutual_d = 0
-    asym_d = 0
-    trait = ["sex", "race", "grade"]
+    out_d = np.count_nonzero(connectivity, axis=1)
 
-    # density DENX2
-    # DENX2 = np.sum(connectivity)/(nodes*(nodes-1))
+    # determine degree nodes (outgoing connections)
+    mean_degree = np.mean(out_d)
+    std_degree = np.std(out_d)
+    degree = [mean_degree, std_degree]
 
-    # density at maximum reach RCHDEN
+    # determine the mutual dyads proportion
+    # create matrix with 2's on mutual dyads, 1's on asymmetric dyads and count occurrence
+    added_up = connectivity + np.transpose(connectivity)
+    mutual_d = np.count_nonzero(added_up == 2, axis=1)
+    mut_prop = mutual_d / out_d
+    # remove 'nan' individuals (with no out-going connections) from list
+    mut_prop = [value for value in mut_prop if not math.isnan(value)]
+    # calculate mean+std mutual dyads proportion
+    mean_mut_prop = np.mean(mut_prop)
+    std_mut_prop = np.std(mut_prop)
+    mut_prop = [mean_mut_prop, std_mut_prop]
 
-    # define the function to tranfer adjacency matrix to reachability matrix
-    # Prints reachability matrix of graph[][] using Floyd Warshall algorithm
-    # function found on https://www.geeksforgeeks.org/transitive-closure-of-a-graph/
-    reachability = copy.deepcopy(connectivity)
-    '''reach[][] will be the output matrix that will finally 
-    have reachability values. 
-    Initialize the solution matrix same as input graph matrix'''
-    reach = [i[:] for i in reachability]
-    '''Add all vertices one by one to the set of intermediate 
-    vertices. 
-    ---> Before start of a iteration, we have reachability value 
-    for all pairs of vertices such that the reachability values 
-    consider only the vertices in set  
-    {0, 1, 2, .. k-1} as intermediate vertices. 
-    ----> After the end of an iteration, vertex no. k is 
-    added to the set of intermediate vertices and the  
-    set becomes {0, 1, 2, .. k}'''
-    for k in range(nodes) :
-
-        # Pick all vertices as source one by one
-        for i in range(nodes) :
-
-            # Pick all vertices as destination for the
-            # above picked source
-            for j in range(nodes) :
-                # If vertex k is on a path from i to j,
-                # then make sure that the value of reach[i][j] is 1
-                reach[i][j] = reach[i][j] or (reach[i][k] and reach[k][j])
-
-    RCHDEN = np.sum(reach) / (nodes * (nodes - 1))
-
-    # relative density RELDEN
-    RELDEN = np.sum(connectivity) / (10 * nodes)
-
-    # create upper triangular matrix with 2's on mutual dyads, 1's on asymmetric dyads and count occurrence
-    added_up = np.triu(connectivity + np.transpose(connectivity))
-    mutual_d = np.count_nonzero(added_up == 2)
-    asym_d = np.count_nonzero(added_up == 1)
-    total_d = mutual_d + asym_d
-
-    # calculate proportion symmetric dyads (PTCMUT) and asymmetric dyads (PTCASY)
-    PTCMUT = mutual_d / total_d
-    # PTCASY = asym_d / total_d
-
-    # count total out_degree connections
-    out_degree = connectivity.sum()
-    # average out_degree
-    av_degree = out_degree / nodes
-    # take the sum of squares of the out degree connections per individual (row)
-    sum_squares_out = (connectivity.sum(axis=1) ** 2).sum()
-
-    # calculate mutuality index (RHO2) (according to Katz and Powell’s (1955))
-    RHO2 = (2 * (nodes - 1) ** 2 * mutual_d - out_degree ** 2 + sum_squares_out) / (
-                out_degree * (nodes - 1) ** 2 - out_degree ** 2 + sum_squares_out)
-
-    # determine the local clustering coefficient mean and standard deviation
+    # determine the local clustering coefficient
     clustering_coefficients = []
     for n_node, connections in enumerate(connectivity) :
         # the amount of neighbours each node has
@@ -131,79 +73,48 @@ def analyse_network(connectivity, characteristics) :
             neighbour_connections = np.sum(connectivity * neighbour_matrix)
             # the amount of connections between neighbours divided by the possible amount of connections
             clustering_coefficients.append(neighbour_connections / (n_neighbours * (n_neighbours - 1)))
-    mean_clustering_coefficient = np.mean(clustering_coefficients)
-    std_clustering_coefficient = np.std(clustering_coefficients)
-    clustering_coefficient = [mean_clustering_coefficient, std_clustering_coefficient]
+    # calculate mean+std clustering coefficient
+    mean_cluster_coef = np.mean(clustering_coefficients)
+    std_cluster_coef = np.std(clustering_coefficients)
+    cluster_coef = [mean_cluster_coef, std_cluster_coef]
 
-    # create homophily index dictionary and lists for the segregation index
-    homoph_ind = dict()
+    # determine the segregation index per characteristic (sex, race, grade)
     segreg_ind = []
-
     # iterate through different characteristics (sex, race, grade)
     for i in range(characteristics.shape[1]) :
         # get different groups of this characteristic in dataset
         characs = sorted(list(set(characteristics[:, i])))
         amount = len(characs)
-
-        # counters for individuals per characteristic group and out-group nominations
-        charac_count = []
-        charac_out = []
-
-        # counters for expected and observed cross trait nominations
-        exp_cross = 0
-        obs_cross = 0
-
+        # for every characteristic own tuple for mean and std
+        segreg_ind_charac = []
         # iterate through different groups of this characteristic
         for j in range(amount) :
             # indicate indices of members this group and save size group
             indices = np.where(characteristics[:, i] == characs[j])[0]
-            charac_count.append(len(indices))
-
+            # calculate ratio out-group individuals
+            ratio_diff = 1 - len(indices) / nodes
             # create a submatrix of all nominations from this group and save amount
             submat_trait = connectivity[np.ix_(indices, )]
-            charac_out.append(submat_trait.sum())
-
-            # create 2 submatrices outgoing connections: 1 to individuals same group and 1 to individuals different group
-            submat_same = connectivity[np.ix_(indices, indices)]
+            # create submatrix outgoing connections to individuals different group
             mask = np.ones(connectivity.shape[0], np.bool)
             mask[indices] = 0
             submat_diff = submat_trait[:, mask]
+            # calculate segregation index per individual of this group for this characteristic
+            for ind in range(len(indices)) :
+                expect_out = submat_trait[ind].sum() * ratio_diff
+                observ_out = submat_diff[ind].sum()
+                seg_ind = (expect_out - observ_out) / expect_out
+                if seg_ind < -1 :
+                    seg_ind = -1
+                segreg_ind_charac.append(seg_ind)
+        # remove 'nan' individuals from list
+        segreg_ind_charac = [value for value in segreg_ind_charac if not math.isnan(value)]
+        # calculate mean+std segregation index this characteristic
+        mean_segreg_ind_charac = np.mean(segreg_ind_charac)
+        std_segreg_ind_charac = np.std(segreg_ind_charac)
+        segreg_ind.append([mean_segreg_ind_charac, std_segreg_ind_charac])
 
-            # count amount outgoing connections to same and to different group
-            out_same = np.mean(submat_same.sum(axis=1))
-            out_diff = np.mean(submat_diff.sum(axis=1))
-
-            # add amount of cross trait nominations of this group to total
-            obs_cross += submat_diff.sum()
-
-            # calculate and save homophily index from this group for this characteristic
-            homoph_ind[str(trait[i]) + "_" + str(characs[j])] = out_same / (out_same + out_diff)
-
-        # calculate expected cross trait nominations (added for all combinations of traits (except with self))
-        for row in range(amount) :
-            for col in range(amount) :
-                if row == col :
-                    pass
-                else :
-                    exp_cross += charac_out[row] * (
-                                (charac_count[row] * charac_count[col]) / (charac_count[row] * (nodes - 1)))
-
-        # calculate and save segregation index for this trait
-        if exp_cross == 0 :
-            segreg_ind.append(9999)
-            if amount == 1 :
-                warnings.warn("Just one group: no segregation index for trait " + str(trait[i]) + "possible.")
-            else :
-                warnings.warn("Expected cross trait nominations is zero: no segregation index for trait " + str(
-                    trait[i]) + "possible.")
-        else :
-            segreg_ind.append((exp_cross - obs_cross) / exp_cross)
-
-    # return av_degree, RCHDEN, RELDEN, RHO2, segreg_ind[0], segreg_ind[1], segreg_ind[2]
-    if clustering_coefficient[0] != clustering_coefficient[0]:
-        clustering_coefficient[0] = 0
-
-    return av_degree, RHO2, clustering_coefficient[0], segreg_ind[0], segreg_ind[1], segreg_ind[2]
+    return degree, mut_prop, cluster_coef[0], segreg_ind[0], segreg_ind[1], segreg_ind[2]
 
 
 class ConnectionMatrix:
@@ -219,16 +130,20 @@ class ConnectionMatrix:
 
     def make_g_0(self):
         """
-        Initialize the first connections
+        Initialize the first connections using the probabilitie of linking: link_prop
         """
         g_0 = np.random.choice([0, 1], size=(self.n, self.n),
                                p=[1 - self.link_prop,
                                self.link_prop])
 
+        # Since you can not link to yourself, the diagonal needs to be zero
         np.fill_diagonal(g_0, 0)
         return g_0
 
     def age_update(self):
+        '''
+        Not used yet
+        '''
         self.age *= self.g
         self.age += self.g
 
@@ -249,7 +164,10 @@ class Model:
         self.zero_sequence = None
 
     def make_prop(self):
-        # Setup probability matrix
+        '''
+        This makes
+        '''
+        # Make room
         prop = np.zeros((self.n, self.n))
 
         # Loop over the person and their peers
@@ -298,7 +216,7 @@ class Model:
         a[i] = 0
         indirect_u = np.sum(a)
 
-        return direct_u + GAMMA * mutual_u + DELTA * indirect_u - cost(d_i)
+        return direct_u + GAMMA * mutual_u + DELTA * indirect_u - d_i ** ALPHA * C
 
     def step(self):
         """ Randomly selects an agent i to revise their link with another random
@@ -325,54 +243,6 @@ class Model:
             else:
                 self.g.g[i, r1] = 1
 
-    def plot_network(self, final=False):
-        """ Uses networkX to plot the directed network g """
-        rows, cols = np.where(self.g.g == 1)  # returns row and column numbers where an edge exists
-
-        # MAke the network
-        edges = zip(rows.tolist(), cols.tolist())
-        gr = nx.DiGraph()
-        gr.add_nodes_from(range(self.n))
-        gr.add_edges_from(edges)
-        # fig.clear()
-
-        race = list(self.X['race'])
-        sex = list(self.X['sex'])
-        grade = list(self.X['grade'])
-
-        ax1.clear()
-        ax2.clear()
-        ax3.clear()
-
-        # Add node colors according to X
-        ax1.set_title('sex')
-        color_map = []
-        for i in range(self.n):
-            for j, unit in enumerate(set(sex)):
-                if np.all(sex[i] == unit):
-                    color_map.append(colors[j])
-        nx.draw(gr, ax=ax1, node_color=color_map, with_labels=False, node_size=100)
-
-        ax2.set_title('race')
-        color_map = []
-        for i in range(self.n) :
-            for j, unit in enumerate(set(race)) :
-                if np.all(race[i] == unit) :
-                    color_map.append(colors[j])
-        nx.draw(gr, ax=ax2, node_color=color_map, with_labels=False, node_size=100)
-
-        ax3.set_title('grade')
-        color_map = []
-        for i in range(self.n) :
-            for j, unit in enumerate(set(grade)) :
-                if np.all(grade[i] == unit) :
-                    color_map.append(colors[j])
-        nx.draw(gr, ax=ax3, node_color=color_map, with_labels=False, node_size=100)
-
-        if not final:
-            plt.pause(2)
-        else:
-            plt.pause(100)
 
     def save2pickle(self, pickle_name):
         """
@@ -406,7 +276,7 @@ class Model:
             self.g_sequence[t] = self.g.g
             self.zero_sequence[t] = conv_rule(self.g_sequence, t)
 
-            if t > MINIMAL and stop_rule(self.zero_sequence, t):
+            if t > n_zeros_conv and stop_rule(self.zero_sequence, t):
                 break
 
             # Produce a plot and diagnostics every t_plot steps
@@ -446,7 +316,7 @@ class Model:
             for j in range(self.n):
                 if self.g.g[i][j] != 0:
                     try:
-                        if sex[i] == 1:
+                        if sex[j] == 1:
                             male.append((j, value_of_con[i][j]))
                         else:
                             female.append((j, value_of_con[i][j]))
@@ -467,9 +337,6 @@ class Model:
                         self.g.g[i][friend] = 0
                 except:
                     pass
-
-
-
 
 def read_excel_settings(loc):
     df = pd.read_excel(loc)
@@ -502,81 +369,96 @@ def read_excel_settings(loc):
 def avg(l, reruns):
     return [sum(l[i*reruns:(i+1)*reruns])/reruns for i in range(int(len(l)/reruns))]
 
-def main(settings, MAX_LEN):
-    global DELTA, GAMMA, C, B1, B2, B3, SIGMA, ALPHA, MIN_PROP, pos_link, MINIMAL, MAX_FRIEND, zeros, n_zeros
-    DELTA, GAMMA, C, SIGMA, B1, B2, B3 = settings
 
-    # Plot info
-    plot_data = {'av_degree':[], 'clustering_coefficient':[], 'RHO2':[],
-                 'segreg_ind0':[], 'segreg_ind1':[], 'segreg_ind2':[]}
-
-    _string = ['av_degree', 'RHO2', 'clustering_coefficient', 'segreg_ind0', 'segreg_ind1', 'segreg_ind2']
-
-    # True
-    # g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
+def true_data_make(models):
+    g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
     big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
 
-    MAX_FRIEND = 5
-    MIN_PROP = 9
-    pos_link = 0.1
-    runs = 1000
-    ALPHA = 2
+    true_data = {'av_degree' : [], 'clustering_coefficient' : [], 'mut_prop' : [],
+                 'segreg_ind0' : [], 'segreg_ind1' : [], 'segreg_ind2' : []}
+    _string = ['av_degree', 'mut_prop', 'clustering_coefficient', 'segreg_ind0', 'segreg_ind1', 'segreg_ind2']
 
-    n_zeros = 3
-    zeros = np.zeros(n_zeros)
-    MINIMAL = n_zeros
-    ########################
+    for num in models:
+        g = g_matrix[num]
+        X = big_x[num]
+
+        output2 = analyse_network(g, X)
+        for s, o in zip(_string, output2):
+            try:
+                true_data[s].append(o[0])
+            except:
+                true_data[s].append(o)
+
+    for s in _string:
+        true_data[s] = avg(true_data[s], len(models))
+
+    return true_data
+
+def find_models(maxi, mini):
+    big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
 
     models = []
-    for model_num in range(len(big_x)):
-        X = big_x[model_num]
-        possible_X = [i[0] for i in list(X.groupby(['sex', 'race']))]
+    for n, x in enumerate(big_x):
+        if len(x) > mini and len(x) < maxi:
+            models.append(n)
+
+    return models
+
+
+def main(settings, schools):
+    '''
+
+    :param settings: list of settings (=DELTA, GAMMA, C, SIGMA, B1, B2, B3)
+    :param schools:  lsit of schools based on index number
+    :return: The outcome of the analyse function in a dict, ordered the same way as schools.
+    '''
+    global DELTA, GAMMA, C, B1, B2, B3, SIGMA, ALPHA, MIN_PROP, pos_link, MINIMAL, MAX_FRIEND, zeros, n_zeros_conv
+
+    # Plot info
+    analyse_data = {'av_degree':[], 'clustering_coefficient':[], 'mut_prop':[],
+                    'segreg_ind0':[], 'segreg_ind1':[], 'segreg_ind2':[]}
+
+    _string = ['av_degree', 'mut_prop', 'clustering_coefficient', 'segreg_ind0', 'segreg_ind1', 'segreg_ind2']
+
+    # True
+    g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
+    big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
+
+    DELTA, GAMMA, C, SIGMA, B1, B2, B3 = settings
+
+    # Constants
+    MAX_FRIEND = 5  # given by the questionair
+    MIN_PROP = 10  # Useful for steering the probabilities
+    pos_link = 0.1  # Possibility to form a link on the innitial matrix
+    max_iterations = 5000
+    ALPHA = 2
+
+    # Convergenge
+    n_zeros_conv = 3
+    zeros = np.zeros(n_zeros_conv)
+
+    # Iterate over the given schools
+    for school in schools:
+        X = big_x[school]
         n_agents = len(X['sex'])
 
-        if n_agents > MAX_LEN:
-            continue
-
-        # Make and run model
+        # Make model and connection matrix
         g = ConnectionMatrix(n_agents, pos_link)
-        M = Model(g, n_agents, X, possible_X)
-        M.run(runs, 0)
-        M.rank()
+        M = Model(g, n_agents, X, [])
 
+        # Run and rank the model
+        M.run(max_iterations, 0)
+        M.rank()  # chooses best 5 female and male friends
+
+        # Collect output data
         output = analyse_network(M.g.g, X)
-        models.append(model_num)
         for s, o in zip(_string, output):
-            plot_data[s].append(o)
+            try:
+                analyse_data[s].append(o[0])
+            except:
+                analyse_data[s].append(o)
 
-    return plot_data
+    return analyse_data
 
 if __name__ == "__main__":
-    from scipy.optimize import minimize
-    import pickle
-
-    settings = [0.2, 0.7, 0.125, 0.05, 0.3, 0.1, 0.01, 2.1]
-    #  DELTA, GAMMA, C, B1, B2, B3, SIGMA, ALPHA
-    # Constraints
-    cons = ({'type' : 'ineq', 'fun' : lambda setting: 5 - setting[0]},  # delta[0, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[0] - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 1 - setting[1]},  # gamma[0, 1]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[1] - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[7]},  # alpha[1, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[7] - 1 - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[2]},  # C[0, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[2] - 1 - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[3]},  # b123[1, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[3] - 1 - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[4]},  # b123[1, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[4] - 1 - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[5]},  # b123[1, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[5] - 1 - 10 ** (-6)},
-            {'type' : 'ineq', 'fun' : lambda setting : 5 - setting[6]},  # b123[1, 5]
-            {'type' : 'ineq', 'fun' : lambda setting : setting[6] - 1 - 10 ** (-6)}
-            )
-
-    res = minimize(main, settings, method='SLSQP', constraints=cons)
-
-    pickle.dump(res, open('res.p', 'wb'))
-
-    print(res)  # check if it converged
-    print(res.x)  # print results
+    main()
