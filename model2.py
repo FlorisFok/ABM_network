@@ -229,7 +229,9 @@ class Model:
 
         for i in self.indexes:
             # Choose new connection
-            r1 = np.random.choice(self.indexes, p=self.P[i])
+            r1 = i
+            while r1 == i:
+                r1 = np.random.choice(self.indexes, p=self.P[i])
 
             # find value for new connection and removed connection
             self.g.g[i, r1] = 0
