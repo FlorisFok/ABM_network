@@ -9,6 +9,12 @@ import copy
 import os
 import pickle
 
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 6))
+colors = ['#FF0000', '#00FF00', '#0000FF',
+          '#FFFF00', '#00FFFF', '#FF00FF', '#C0C0C0',
+          '#808080', '#800000',	'#808000', '#008000',
+          '#800080', '#008080', '#000080']
+
 ## conv_rule ###########
 def conv_rule(g_sequence, t):
     return np.linalg.norm((g_sequence[t - 1] - g_sequence[t]), ord=1)
@@ -193,12 +199,22 @@ class Model:
         sex = list(self.X['sex'])
         grade = list(self.X['grade'])
 
-        # Fill U
-        for i in range(self.n):
-            for j in range(self.n):
-                pre_cal_u[i, j] = math.exp(- B1 * abs(sex[i] - sex[j])
-                                           - B2 * abs(grade[i] - grade[j])
-                                           - B3 * (0 if race[i] == race[j] else 1))
+        try:
+            new = list(self.X['new'])
+            # Fill U
+            for i in range(self.n) :
+                for j in range(self.n) :
+                    pre_cal_u[i, j] = math.exp(- B1 * abs(sex[i] - sex[j])
+                                               - B2 * abs(grade[i] - grade[j])
+                                               - B3 * (0 if race[i] == race[j] else 1)
+                                               - ((B1+B2+B3)/3) * abs(new[i] - new[j]))
+        except:
+            # Fill U
+            for i in range(self.n):
+                for j in range(self.n):
+                    pre_cal_u[i, j] = math.exp(- B1 * abs(sex[i] - sex[j])
+                                               - B2 * abs(grade[i] - grade[j])
+                                               - B3 * (0 if race[i] == race[j] else 1))
 
         return pre_cal_u
 
@@ -229,7 +245,7 @@ class Model:
         for i in self.indexes:
             # Choose new connection
             r1 = i
-            while r1 == i:
+            while r1==i:
                 r1 = np.random.choice(self.indexes, p=self.P[i])
 
             # find value for new connection and removed connection
@@ -283,10 +299,56 @@ class Model:
 
             # Produce a plot and diagnostics every t_plot steps
             if t % t_plot == 0:
-                print("degree:", np.sum(self.g.g))
                 self.plot_network()
 
         return t
+
+    def plot_network(self):
+        """ Uses networkX to plot the directed network g """
+        rows, cols = np.where(self.g.g == 1)  # returns row and column numbers where an edge exists
+
+        # MAke the network
+        edges = zip(rows.tolist(), cols.tolist())
+        gr = nx.DiGraph()
+        gr.add_nodes_from(range(self.n))
+        gr.add_edges_from(edges)
+        # fig.clear()
+
+        race = list(self.X['race'])
+        sex = list(self.X['sex'])
+        grade = list(self.X['grade'])
+
+        ax1.clear()
+        ax2.clear()
+        ax3.clear()
+
+        # Add node colors according to X
+        ax1.set_title('sex')
+        color_map = []
+        for i in range(self.n):
+            for j, unit in enumerate(set(sex)):
+                if np.all(sex[i] == unit):
+                    color_map.append(colors[j])
+        nx.draw(gr, ax=ax1, node_color=color_map, with_labels=False, node_size=100)
+
+        ax2.set_title('race')
+        color_map = []
+        for i in range(self.n) :
+            for j, unit in enumerate(set(race)) :
+                if np.all(race[i] == unit) :
+                    color_map.append(colors[j])
+        nx.draw(gr, ax=ax2, node_color=color_map, with_labels=False, node_size=100)
+
+        ax3.set_title('grade')
+        color_map = []
+        for i in range(self.n) :
+            for j, unit in enumerate(set(grade)) :
+                if np.all(grade[i] == unit) :
+                    color_map.append(colors[j])
+        nx.draw(gr, ax=ax3, node_color=color_map, with_labels=False, node_size=100)
+
+        plt.pause(2)
+
 
     def rank(self):
         """
@@ -407,7 +469,7 @@ def find_models(maxi, mini):
     return models
 
 
-def main(settings, schools):
+def main(settings, schools, plot_steps=False):
     '''
 
     :param settings: list of settings (=DELTA, GAMMA, C, SIGMA, B1, B2, B3)
@@ -426,6 +488,7 @@ def main(settings, schools):
     g_matrix = pickle.load(open(r"C:\Users\FlorisFok\Downloads\g_list.pkl", 'rb'))
     big_x = pickle.load(open(r"C:\Users\FlorisFok\Downloads\x_list.pkl", 'rb'))
 
+
     DELTA, GAMMA, C, SIGMA, B1, B2, B3 = settings
 
     # Constants
@@ -439,17 +502,26 @@ def main(settings, schools):
     n_zeros_conv = 3
     zeros = np.zeros(n_zeros_conv)
 
+
     # Iterate over the given schools
     for school in schools:
         X = big_x[school]
         n_agents = len(X['sex'])
 
+        # Plot variables
+        if plot_steps:
+            possible_X = [i[0] for i in list(X.groupby(['sex', 'race']))]
+            plot_step = int(25)
+        else:
+            possible_X = []
+            plot_step = 0
+
         # Make model and connection matrix
         g = ConnectionMatrix(n_agents, pos_link)
-        M = Model(g, n_agents, X, [])
+        M = Model(g, n_agents, X, possible_X)
 
         # Run and rank the model
-        M.run(max_iterations, 0)
+        M.run(max_iterations, plot_step)
         M.rank()  # chooses best 5 female and male friends
 
         # Collect output data
@@ -460,7 +532,17 @@ def main(settings, schools):
             except:
                 analyse_data[s].append(o)
 
+    # Save last figure since it disappears in 2 seconds
+    if plot_steps:
+        M.plot_network()
+        fig.savefig('results.png')
+
     return analyse_data
 
 if __name__ == "__main__":
-    main()
+    print('start')
+    results = main([0.05, 0.65, 0.175, 0.035, 0.1, 0.1, 0.2], [0], True)
+
+    print('The output is:')
+    for k, v in results.items():
+        print('  * ', k, ":", v)
